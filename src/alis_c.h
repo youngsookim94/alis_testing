@@ -11,6 +11,7 @@
 #include <values.h>
 #include <complex.h>
 #include <ieee754.h>
+#include <stdbool.h>
 
 #define NIL 7
 #define BBC 6
@@ -139,6 +140,16 @@ float complex ***makeComplexField(int, int, int, int, int, int);
 #define removeField(F,i,j,k) free(&F[i][j][k]),free(&F[i][j]),free(&F[i]),F=0
 void *h5read(int*, char*, ...);
 void h5write(int*, float*, char*, ...);
+
+/* CUDA support functions */
+#ifdef __cplusplus
+extern "C" {
+#endif
+bool cuda_updateF(world W, vfield F, vfield G, coeffs *C, int Alt, int iMin, int iMax, int jMin, int jMax, int kMin, int kMax);
+void cuda_cleanup_fields(void);
+#ifdef __cplusplus
+}
+#endif
 
 
 /* object.c and shapes.c */

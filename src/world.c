@@ -444,6 +444,9 @@ static void removeVFieldCoeff(world W, coeffs *C)
 
 void deleteWorld(world W)
 {
+#if USE_CUDA
+	cuda_cleanup_fields();
+#endif
 	removeSources(W);
 	removeObjects(W);
 	removeVFieldCoeff(W, W->CE);

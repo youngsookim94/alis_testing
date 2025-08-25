@@ -1,17 +1,30 @@
 #CC = icc -xSSE4.1 -ansi-alias -openmp
 CC = gcc -fopenmp -fopt-info-vec
+NVCC = nvcc
 LINK_FLAGS = -shared -lpng
 COMPILE_FLAGS = -O3 -std=c99 -I/usr/include -I/usr/include/hdf5/serial -fpic -c
+CUDA_FLAGS = -O3 -arch=sm_50 -Xcompiler -fPIC -c
+
+# CUDA support - set to 1 to enable
+USE_CUDA ?= 0
+
+ifeq ($(USE_CUDA),1)
+    LINK_FLAGS += -lcudart
+    COMPILE_FLAGS += -DUSE_CUDA=1
+    CUDA_OBJECTS = update_cuda.o
+else
+    CUDA_OBJECTS =
+endif
 
 all: libalis.a libalis.so
 
-libalis.a: world.o object.o shapes.o source.o update.o output.o slices.o fields.o phaser.o farfld.o
+libalis.a: world.o object.o shapes.o source.o update.o output.o slices.o fields.o phaser.o farfld.o $(CUDA_OBJECTS)
 	rm -f libalis.a
-	ar rcs libalis.a world.o object.o shapes.o source.o update.o output.o slices.o fields.o phaser.o farfld.o
+	ar rcs libalis.a world.o object.o shapes.o source.o update.o output.o slices.o fields.o phaser.o farfld.o $(CUDA_OBJECTS)
 
-libalis.so: world.o object.o shapes.o source.o update.o output.o slices.o fields.o phaser.o farfld.o
+libalis.so: world.o object.o shapes.o source.o update.o output.o slices.o fields.o phaser.o farfld.o $(CUDA_OBJECTS)
 	rm -f libalis.so
-	$(CC) $(LINK_FLAGS) -o libalis.so world.o object.o shapes.o source.o update.o output.o slices.o fields.o phaser.o farfld.o
+	$(CC) $(LINK_FLAGS) -o libalis.so world.o object.o shapes.o source.o update.o output.o slices.o fields.o phaser.o farfld.o $(CUDA_OBJECTS)
 
 world.o: alis_c.h world.c
 	$(CC) $(COMPILE_FLAGS) -o world.o world.c
@@ -42,6 +55,9 @@ phaser.o: alis_c.h phaser.c
 
 farfld.o: alis_c.h farfld.c
 	$(CC) $(COMPILE_FLAGS) -o farfld.o farfld.c
+
+update_cuda.o: alis_c.h update_cuda.cu
+	$(NVCC) $(CUDA_FLAGS) -o update_cuda.o update_cuda.cu
 
 clean:
 	rm -f *.a *.o *.so

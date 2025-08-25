@@ -1,7 +1,10 @@
 prefix=/usr
 
+# CUDA support - set to 1 to enable
+USE_CUDA ?= 0
+
 all:
-	cd src && make && cd ..
+	cd src && make USE_CUDA=$(USE_CUDA) && cd ..
 	gcc -std=c99 -fopenmp -O3 -o bin/alispp bin/alispp.c
 	gcc -std=c99 -fopenmp -O3 -o bin/abench bin/abench.c
 

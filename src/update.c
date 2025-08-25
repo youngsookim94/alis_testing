@@ -10,6 +10,11 @@
 _Pragma("omp parallel for") for (int i=iMin; i<=iMax; i++) for (int j=jMin; j<=jMax; j++) \
 _Pragma("GCC ivdep") for (int k=kMin; k<=kMax; k++)
 
+// CUDA support flag - can be controlled at compile time
+#ifndef USE_CUDA
+#define USE_CUDA 0
+#endif
+
 
 int (timer)(long int n, long int N, char *str, ...)
 {
@@ -84,7 +89,7 @@ static void updatePz(vfield F, vfield G, coeffs *C, float ***Px, float ***Py, in
 }
 
 
-static void updateF(world W, vfield F, vfield G, coeffs *C, int Alt, int iMin, int iMax, int jMin, int jMax, int kMin, int kMax)
+static void updateF_cpu(world W, vfield F, vfield G, coeffs *C, int Alt, int iMin, int iMax, int jMin, int jMax, int kMin, int kMax)
 {
 	for (int n=0; n<C->N; n++) {
 		int iMinJ = MAX(iMin, C->iMin[n]), iMaxJ = MIN(iMax, C->iMax[n]);
@@ -122,6 +127,28 @@ static void updateF(world W, vfield F, vfield G, coeffs *C, int Alt, int iMin, i
 	if (W->iMAX > W->iMax) updatePx(F, G, C, F.xMaxPy, F.xMaxPz, Alt, W->iMax+2, W->iMAX, jMin, jMax, kMin, kMax);
 	if (W->jMAX > W->jMax) updatePy(F, G, C, F.yMaxPz, F.yMaxPx, Alt, iMin, iMax, W->jMax+2, W->jMAX, kMin, kMax);
 	if (W->kMAX > W->kMax) updatePz(F, G, C, F.zMaxPx, F.zMaxPy, Alt, iMin, iMax, jMin, jMax, W->kMax+2, W->kMAX);
+}
+
+static void updateF(world W, vfield F, vfield G, coeffs *C, int Alt, int iMin, int iMax, int jMin, int jMax, int kMin, int kMax)
+{
+#if USE_CUDA
+	// Try CUDA first, fall back to CPU if CUDA fails
+	// For simplicity in this initial implementation, only use CUDA for the main field update loop
+	// Keep complex material updates on CPU for now
+	bool use_gpu = (C->N == 0); // Only use GPU for simple cases without complex materials
+	if (use_gpu && cuda_updateF(W, F, G, C, Alt, iMin, iMax, jMin, jMax, kMin, kMax)) {
+		// CUDA update successful - still need to handle PML boundaries on CPU
+		if (W->iMIN < W->iMin) updatePx(F, G, C, F.xMinPy, F.xMinPz, Alt, W->iMIN-(Alt-1)/2, W->iMin-(Alt+3)/2, jMin, jMax, kMin, kMax);
+		if (W->jMIN < W->jMin) updatePy(F, G, C, F.yMinPz, F.yMinPx, Alt, iMin, iMax, W->jMIN-(Alt-1)/2, W->jMin-(Alt+3)/2, kMin, kMax);
+		if (W->kMIN < W->kMin) updatePz(F, G, C, F.zMinPx, F.zMinPy, Alt, iMin, iMax, jMin, jMax, W->kMIN-(Alt-1)/2, W->kMin-(Alt+3)/2);
+		if (W->iMAX > W->iMax) updatePx(F, G, C, F.xMaxPy, F.xMaxPz, Alt, W->iMax+2, W->iMAX, jMin, jMax, kMin, kMax);
+		if (W->jMAX > W->jMax) updatePy(F, G, C, F.yMaxPz, F.yMaxPx, Alt, iMin, iMax, W->jMax+2, W->jMAX, kMin, kMax);
+		if (W->kMAX > W->kMax) updatePz(F, G, C, F.zMaxPx, F.zMaxPy, Alt, iMin, iMax, jMin, jMax, W->kMax+2, W->kMAX);
+		return;
+	}
+#endif
+	// Fall back to CPU implementation
+	updateF_cpu(W, F, G, C, Alt, iMin, iMax, jMin, jMax, kMin, kMax);
 }
 
 
